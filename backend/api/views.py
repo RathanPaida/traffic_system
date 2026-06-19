@@ -5,42 +5,56 @@ import joblib
 import os
 from django.conf import settings
 
-# Point to the ml_models folder
-MODEL_PATH = os.path.join(settings.BASE_DIR, 'ml_models', 'traffic_model.pkl')
-ENCODER_PATH = os.path.join(settings.BASE_DIR, 'ml_models', 'cause_encoder.pkl')
+# Load Upgraded Models
+MODEL_PATH = os.path.join(settings.BASE_DIR, 'ml_models', 'traffic_model_v2.pkl')
+ENCODER_PATH = os.path.join(settings.BASE_DIR, 'ml_models', 'encoders_v2.pkl')
 
-# Load models when server starts
 model = joblib.load(MODEL_PATH)
-encoder = joblib.load(ENCODER_PATH)
+encoders = joblib.load(ENCODER_PATH)
 
 @api_view(['POST'])
 def predict_traffic(request):
     try:
         data = request.data
         
-        # 1. Get data from the frontend request
+        # 1. Parse Data (with defaults if missing)
         lat = float(data.get('latitude', 12.9716))
         lon = float(data.get('longitude', 77.5946))
         hour = int(data.get('hour', 12))
         day = int(data.get('day_of_week', 0))
+        closure = int(data.get('requires_road_closure', 0))
+        
         cause = data.get('event_cause', 'vehicle_breakdown')
+        priority = data.get('priority', 'High')
+        veh_type = data.get('veh_type', 'car')
         
-        # 2. Convert text cause to number
-        try:
-            cause_encoded = encoder.transform([cause])[0]
-        except ValueError:
-            cause_encoded = 0 # Default if unknown cause
+        # 2. Safely encode text (if unknown text comes from frontend, default to 0)
+        def encode_safe(col_name, val):
+            try:
+                return encoders[col_name].transform([val])[0]
+            except ValueError:
+                return 0
+
+        cause_encoded = encode_safe('event_cause', cause)
+        priority_encoded = encode_safe('priority', priority)
+        veh_encoded = encode_safe('veh_type', veh_type)
             
-        # 3. Ask the ML model to predict duration
-        prediction = model.predict([[lat, lon, hour, day, cause_encoded]])
-        estimated_minutes = round(prediction[0])
+        # 3. Predict
+        input_data = [[lat, lon, hour, day, closure, cause_encoded, priority_encoded, veh_encoded]]
+        estimated_minutes = round(model.predict(input_data)[0])
         
-        # 4. Determine Resources based on prediction
-        resources = {"personnel": 2, "barricades": 5}
-        if estimated_minutes > 120:
-            resources = {"personnel": 6, "barricades": 20}
+        # 4. Smart Resource Allocation Logic
+        resources = {
+            "personnel": 2, 
+            "barricades": 5, 
+            "tow_trucks": 1 if veh_type in ['hgv', 'truck', 'bus'] else 0,
+            "severity": "Low"
+        }
+        
+        if estimated_minutes > 120 or priority == 'High':
+            resources.update({"personnel": 6, "barricades": 20, "severity": "Critical"})
         elif estimated_minutes > 60:
-            resources = {"personnel": 4, "barricades": 10}
+            resources.update({"personnel": 4, "barricades": 10, "severity": "Medium"})
 
         return Response({
             "status": "success",
