@@ -3,20 +3,11 @@ import { useState } from 'react';
 import axios from 'axios';
 import { Clock, Users, ShieldAlert, Truck, Activity, MapPin } from 'lucide-react';
 
-interface PredictionResult {
-  estimated_clearance_minutes: number;
-  required_resources: {
-    severity: string;
-    personnel: number;
-    barricades: number;
-    tow_trucks: number;
-  };
-}
-
 export default function Dashboard() {
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<PredictionResult | null>(null);
+  const [result, setResult] = useState<any>(null);
   
+  // UPDATED: Added corridor and description to the default state
   const [formData, setFormData] = useState({
     latitude: '12.9716',
     longitude: '77.5946',
@@ -25,7 +16,9 @@ export default function Dashboard() {
     event_cause: 'vehicle_breakdown',
     priority: 'High',
     veh_type: 'truck',
-    requires_road_closure: '0'
+    requires_road_closure: '0',
+    corridor: 'Outer Ring Road',
+    description: 'driver changing flat tire on the shoulder'
   });
 
   const analyzeImpact = async () => {
@@ -50,7 +43,7 @@ export default function Dashboard() {
             <Activity className="text-blue-600" size={32} />
             Traffic Intelligence & Resource AI
           </h1>
-          <p className="text-slate-500 mt-2">Predict event impact and optimize city resource deployment.</p>
+          <p className="text-slate-500 mt-2">Predict event impact and optimize city resource deployment using XGBoost & NLP.</p>
         </header>
         
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -59,28 +52,22 @@ export default function Dashboard() {
           <div className="lg:col-span-5 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
             <h2 className="text-xl font-bold text-slate-800 mb-6 border-b pb-2">Event Parameters</h2>
             
-            <div className="space-y-5">
+            <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label htmlFor="latitude" className="block text-sm font-medium text-slate-600 mb-1">Latitude</label>
                   <input 
-                    id="latitude"
-                    title="Latitude"
-                    placeholder="12.9716"
+                    id="latitude" title="Latitude" placeholder="12.9716"
                     className="w-full p-2.5 border rounded-lg bg-slate-50" 
-                    value={formData.latitude} 
-                    onChange={e => setFormData({...formData, latitude: e.target.value})} 
+                    value={formData.latitude} onChange={e => setFormData({...formData, latitude: e.target.value})} 
                   />
                 </div>
                 <div>
                   <label htmlFor="longitude" className="block text-sm font-medium text-slate-600 mb-1">Longitude</label>
                   <input 
-                    id="longitude"
-                    title="Longitude"
-                    placeholder="77.5946"
+                    id="longitude" title="Longitude" placeholder="77.5946"
                     className="w-full p-2.5 border rounded-lg bg-slate-50" 
-                    value={formData.longitude} 
-                    onChange={e => setFormData({...formData, longitude: e.target.value})} 
+                    value={formData.longitude} onChange={e => setFormData({...formData, longitude: e.target.value})} 
                   />
                 </div>
               </div>
@@ -89,25 +76,17 @@ export default function Dashboard() {
                 <div>
                   <label htmlFor="hour" className="block text-sm font-medium text-slate-600 mb-1">Time of Day (0-23)</label>
                   <input 
-                    id="hour"
-                    title="Hour of day"
-                    placeholder="17"
-                    type="number" 
+                    id="hour" title="Hour of day" placeholder="17" type="number" 
                     className="w-full p-2.5 border rounded-lg bg-slate-50" 
-                    value={formData.hour} 
-                    onChange={e => setFormData({...formData, hour: e.target.value})} 
+                    value={formData.hour} onChange={e => setFormData({...formData, hour: e.target.value})} 
                   />
                 </div>
                 <div>
                   <label htmlFor="day" className="block text-sm font-medium text-slate-600 mb-1">Day (0=Mon, 6=Sun)</label>
                   <input 
-                    id="day"
-                    title="Day of week"
-                    placeholder="4"
-                    type="number" 
+                    id="day" title="Day of week" placeholder="4" type="number" 
                     className="w-full p-2.5 border rounded-lg bg-slate-50" 
-                    value={formData.day_of_week} 
-                    onChange={e => setFormData({...formData, day_of_week: e.target.value})} 
+                    value={formData.day_of_week} onChange={e => setFormData({...formData, day_of_week: e.target.value})} 
                   />
                 </div>
               </div>
@@ -115,11 +94,9 @@ export default function Dashboard() {
               <div>
                 <label htmlFor="cause" className="block text-sm font-medium text-slate-600 mb-1">Event Cause</label>
                 <select 
-                  id="cause"
-                  title="Select event cause"
+                  id="cause" title="Select event cause"
                   className="w-full p-2.5 border rounded-lg bg-slate-50" 
-                  value={formData.event_cause} 
-                  onChange={e => setFormData({...formData, event_cause: e.target.value})}
+                  value={formData.event_cause} onChange={e => setFormData({...formData, event_cause: e.target.value})}
                 >
                   <option value="vehicle_breakdown">Vehicle Breakdown</option>
                   <option value="accident">Accident</option>
@@ -132,11 +109,9 @@ export default function Dashboard() {
                 <div>
                   <label htmlFor="priority" className="block text-sm font-medium text-slate-600 mb-1">Road Priority</label>
                   <select 
-                    id="priority"
-                    title="Select road priority"
+                    id="priority" title="Select road priority"
                     className="w-full p-2.5 border rounded-lg bg-slate-50" 
-                    value={formData.priority} 
-                    onChange={e => setFormData({...formData, priority: e.target.value})}
+                    value={formData.priority} onChange={e => setFormData({...formData, priority: e.target.value})}
                   >
                     <option value="High">High</option>
                     <option value="Medium">Medium</option>
@@ -146,11 +121,9 @@ export default function Dashboard() {
                 <div>
                   <label htmlFor="vehicle" className="block text-sm font-medium text-slate-600 mb-1">Vehicle Type</label>
                   <select 
-                    id="vehicle"
-                    title="Select vehicle type"
+                    id="vehicle" title="Select vehicle type"
                     className="w-full p-2.5 border rounded-lg bg-slate-50" 
-                    value={formData.veh_type} 
-                    onChange={e => setFormData({...formData, veh_type: e.target.value})}
+                    value={formData.veh_type} onChange={e => setFormData({...formData, veh_type: e.target.value})}
                   >
                     <option value="car">Car / LMV</option>
                     <option value="truck">Truck / HGV</option>
@@ -160,13 +133,33 @@ export default function Dashboard() {
                 </div>
               </div>
 
+              {/* NEW: Corridor and NLP Description Fields */}
+              <div className="grid grid-cols-1 gap-4">
+                <div>
+                  <label htmlFor="corridor" className="block text-sm font-medium text-slate-600 mb-1">Corridor / Zone</label>
+                  <input 
+                    id="corridor" title="Corridor" placeholder="e.g. Outer Ring Road"
+                    className="w-full p-2.5 border rounded-lg bg-slate-50" 
+                    value={formData.corridor} onChange={e => setFormData({...formData, corridor: e.target.value})} 
+                  />
+                </div>
+                <div>
+                  <label htmlFor="description" className="block text-sm font-medium text-slate-600 mb-1">Incident Description (NLP Analysis)</label>
+                  <textarea 
+                    id="description" title="Description" placeholder="Describe the incident..." rows={2}
+                    className="w-full p-2.5 border rounded-lg bg-slate-50 resize-none" 
+                    value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} 
+                  />
+                </div>
+              </div>
+
               <button 
                 onClick={analyzeImpact}
                 disabled={loading}
-                className="w-full mt-4 bg-blue-600 text-white font-bold py-3.5 rounded-xl hover:bg-blue-700 transition flex justify-center items-center gap-2 shadow-lg shadow-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                className="w-full mt-2 bg-blue-600 text-white font-bold py-3.5 rounded-xl hover:bg-blue-700 transition flex justify-center items-center gap-2 shadow-lg shadow-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                 title="Generate Forecast"
               >
-                {loading ? 'Analyzing...' : 'Generate AI Forecast'}
+                {loading ? 'Analyzing Data Pipeline...' : 'Generate AI Forecast'}
               </button>
             </div>
           </div>

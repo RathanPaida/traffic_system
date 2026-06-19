@@ -1,69 +1,84 @@
 # backend/train_model.py
 import pandas as pd
-from sklearn.ensemble import RandomForestRegressor
+import numpy as np
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import LabelEncoder
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics import mean_absolute_error
+from xgboost import XGBRegressor
 import joblib
 import os
 
 print("Loading data...")
-# Make sure your CSV is inside the backend/data/ folder
 df = pd.read_csv('data/Astram event data_anonymized.csv')
 
-print("Cleaning & Upgrading features...")
-# Convert to datetime objects
+print("Cleaning data & Applying Time Fixes...")
 df['start_datetime'] = pd.to_datetime(df['start_datetime'], errors='coerce')
-df['end_datetime'] = pd.to_datetime(df['end_datetime'], errors='coerce')
+# 🚨 Using the system-generated closed_datetime instead of the manual end_datetime
+df['closed_datetime'] = pd.to_datetime(df['closed_datetime'], errors='coerce')
 
-# Calculate duration in minutes
-df['duration_minutes'] = (df['end_datetime'] - df['start_datetime']).dt.total_seconds() / 60
-
-# Drop rows that are missing critical data
+# Calculate duration
+df['duration_minutes'] = (df['closed_datetime'] - df['start_datetime']).dt.total_seconds() / 60
 df = df.dropna(subset=['duration_minutes', 'latitude', 'longitude'])
 
-# 🚨 OUTLIER FIX: Remove impossible administrative errors 🚨
-# Only keep events that took between 2 minutes and 12 hours (720 minutes)
-df = df[(df['duration_minutes'] >= 2) & (df['duration_minutes'] <= 720)]
+# Keep only realistic events (between 2 minutes and 6 hours)
+df = df[(df['duration_minutes'] >= 2) & (df['duration_minutes'] <= 360)]
 
-# Extract Temporal features
-df['hour'] = df['start_datetime'].dt.hour
-df['day_of_week'] = df['start_datetime'].dt.dayofweek
+# Cyclical Time Encoding
+df['hour_sin'] = np.sin(2 * np.pi * df['start_datetime'].dt.hour / 24)
+df['hour_cos'] = np.cos(2 * np.pi * df['start_datetime'].dt.hour / 24)
+df['day_sin'] = np.sin(2 * np.pi * df['start_datetime'].dt.dayofweek / 7)
+df['day_cos'] = np.cos(2 * np.pi * df['start_datetime'].dt.dayofweek / 7)
 
-# Convert boolean road closure to integer (True = 1, False = 0)
+# Handle Missing Categorical Data
 df['requires_road_closure'] = df['requires_road_closure'].astype(bool).astype(int)
+df['corridor'] = df['corridor'].fillna('Unknown')
+df['description'] = df['description'].fillna('') 
+df['event_cause'] = df['event_cause'].fillna('Unknown')
+df['priority'] = df['priority'].fillna('Medium')
+df['veh_type'] = df['veh_type'].fillna('Unknown')
 
-# Create Encoders for text-based categorical columns
-encoders = {}
-categorical_cols = ['event_cause', 'priority', 'veh_type']
-
-for col in categorical_cols:
-    le = LabelEncoder()
-    # Fill empty text with 'Unknown' so the model doesn't crash on blank cells
-    df[col] = df[col].fillna('Unknown').astype(str)
-    df[f'{col}_encoded'] = le.fit_transform(df[col])
-    encoders[col] = le
-
-# Select the upgraded features for the AI to learn from
-features = ['latitude', 'longitude', 'hour', 'day_of_week', 'requires_road_closure', 
-            'event_cause_encoded', 'priority_encoded', 'veh_type_encoded']
-
+features = ['latitude', 'longitude', 'hour_sin', 'hour_cos', 'day_sin', 'day_cos', 
+            'requires_road_closure', 'event_cause', 'priority', 'veh_type', 'corridor', 'description']
 X = df[features]
 y = df['duration_minutes']
 
-print("Training Upgraded Model (this might take a moment)...")
-# Split the data into training (80%) and testing (20%)
+print("Building AI Pipeline...")
+preprocessor = ColumnTransformer(
+    transformers=[
+        ('num', StandardScaler(), ['latitude', 'longitude', 'hour_sin', 'hour_cos', 'day_sin', 'day_cos', 'requires_road_closure']),
+        ('cat', OneHotEncoder(handle_unknown='ignore'), ['event_cause', 'priority', 'veh_type', 'corridor']),
+        ('text', TfidfVectorizer(max_features=25, stop_words='english'), 'description')
+    ])
+
+# XGBoost optimized for Median accuracy (ignoring massive outliers)
+smart_model = XGBRegressor(
+    n_estimators=200, 
+    max_depth=5, 
+    learning_rate=0.1, 
+    objective='reg:absoluteerror', 
+    random_state=42
+)
+
+pipeline = Pipeline(steps=[
+    ('preprocessor', preprocessor),
+    ('model', smart_model)
+])
+
+print("Training the precision AI model...")
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-# Initialize and train the Random Forest AI
-model = RandomForestRegressor(n_estimators=100, random_state=42) 
-model.fit(X_train, y_train)
+pipeline.fit(X_train, y_train)
 
-print("Creating directory and saving models...")
-# Ensure the ml_models folder exists
+predictions = pipeline.predict(X_test)
+mae = mean_absolute_error(y_test, predictions)
+
+print(f"\n✅ Training Complete!")
+print(f"📊 Final Model Accuracy Error Margin: +/- {mae:.2f} minutes")
+
+print("Saving the Ultimate Pipeline...")
 os.makedirs('ml_models', exist_ok=True)
-
-# Save the trained model and the encoders to disk
-joblib.dump(model, 'ml_models/traffic_model_v2.pkl')
-joblib.dump(encoders, 'ml_models/encoders_v2.pkl') 
-
-print("Done! Model trained and saved successfully. You can now start the Django server.")
+joblib.dump(pipeline, 'ml_models/traffic_pipeline_v3.pkl') 
+print("Done! Restart your Django server.")
