@@ -1,7 +1,12 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Fix: suppress multiple lockfile warning by setting workspace root
+  experimental: {
+    turbo: {
+      root: __dirname,
+    },
+  },
 };
 
 export default nextConfig;
