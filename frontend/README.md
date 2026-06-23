@@ -1,36 +1,72 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🚦 Astram Smart Traffic Routing System
 
-## Getting Started
+> AI-powered event-driven traffic congestion forecasting and dynamic routing for smart cities.
 
-First, run the development server:
+## 🔴 Live Demo
+**[https://traffic-system-five.vercel.app](https://traffic-system-five.vercel.app)**
 
+---
+
+## 🧠 Problem Statement
+Political rallies, festivals, sports events, and construction activities create localized traffic breakdowns. Traditional traffic management is reactive — resources are deployed based on experience with no post-event learning system.
+
+**Our Solution:** Use historical and real-time data to forecast event-related traffic impact and recommend optimal manpower, barricading, and diversion plans.
+
+---
+
+## ⚙️ Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Frontend | Next.js 16, TypeScript, TailwindCSS |
+| Backend | Django REST Framework, Python |
+| ML Models | XGBoost, Scikit-learn, KMeans Clustering |
+| Routing Algorithm | Dijkstra's Algorithm on dynamic city graph |
+| Maps | MapLibre GL (react-map-gl) |
+| Deployment | Vercel (frontend) + Render (backend) |
+
+---
+
+## 🚀 Features
+- **AI Traffic Prediction** — XGBoost model predicts clearance time based on incident type, severity, location
+- **Dynamic Route Generation** — Dijkstra's algorithm finds optimal bypass routes avoiding incidents
+- **Live Heatmap** — Real-time visualization of traffic congestion hotspots across the city
+- **Resource Dispatch Matrix** — Recommends exact number of officers, barricades, and tow trucks needed
+
+---
+
+## 🛠️ Local Development
+
+### Backend (Django)
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cd backend
+pip install -r requirements.txt
+python manage.py runserver
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Frontend (Next.js)
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Create `frontend/.env.local`:
+```env
+NEXT_PUBLIC_API_URL=http://127.0.0.1:8000
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+---
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 📁 Project Structure
+```
+traffic_system/
+├── backend/          # Django REST API + ML models
+│   ├── api/          # Views, URLs, models
+│   ├── ml_models/    # Trained .pkl files
+│   ├── data/         # Dataset (Astram event data)
+│   └── Procfile      # Render deployment config
+└── frontend/         # Next.js dashboard
+    └── app/
+        └── page.tsx  # Main dashboard component
+```
