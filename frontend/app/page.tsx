@@ -5,6 +5,8 @@ import { Activity, Map as MapIcon, Navigation, Users, ShieldAlert, Truck, AlertT
 import Map, { Source, Layer, Marker } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+
 export default function Dashboard() {
   const [view, setView] = useState<'predict' | 'map'>('predict');
   const [loading, setLoading] = useState(false);
@@ -22,9 +24,9 @@ export default function Dashboard() {
   });
 
   useEffect(() => {
-    axios.get('http://127.0.0.1:8000/api/heatmap/').then(res => setHeatmapData(res.data)).catch(err => console.error("Heatmap fetch error:", err));
+    axios.get(`${API_BASE_URL}/api/heatmap/`).then(res => setHeatmapData(res.data)).catch(err => console.error("Heatmap fetch error:", err));
     
-    axios.get('http://127.0.0.1:8000/api/corridors/').then(res => {
+    axios.get(`${API_BASE_URL}/api/corridors/`).then(res => {
         setCorridors(res.data.corridors);
         if(res.data.corridors.length > 2) {
             setFormData(prev => ({
@@ -40,10 +42,10 @@ export default function Dashboard() {
   const analyzeAndRoute = async () => {
     setLoading(true);
     try {
-      const aiResponse = await axios.post('http://127.0.0.1:8000/api/predict/', formData);
+      const aiResponse = await axios.post(`${API_BASE_URL}/api/predict/`, formData);
       setAiResult(aiResponse.data);
 
-      const routeResponse = await axios.post('http://127.0.0.1:8000/api/route/', {
+      const routeResponse = await axios.post(`${API_BASE_URL}/api/route/`, {
         start: formData.start_node,
         end: formData.end_node,
         incident_location: formData.corridor,
